@@ -1,0 +1,174 @@
+<!DOCTYPE html>
+<html>
+<head>
+<!-- Load the Paper.js library -->
+<script type="text/javascript" src="js/paper.js"></script>
+<script type="text/javascript" src="js/jquery.js"></script>
+<!-- Define inlined JavaScript -->
+<script type="text/javascript">
+
+  // Make the paper scope global, by injecting it into window:
+  paper.install(window);
+
+  // Keep track of on-going touches
+  var ongoingTouches = new Array;
+
+  var grab_pt_1, grab_pt_2; 
+
+  var raster;
+
+  // Only executed our code once the DOM is ready.
+  window.onload = function() {
+
+    // Create an empty project and a view for the canvas
+    var canvas = document.getElementById('myCanvas');
+    paper.setup(canvas);
+
+    // Create a raster item using the image tag with id='mona'
+    raster = new Raster('lena');
+
+    // Move the raster to the center of the view
+    raster.position = view.center;
+
+    raster.originalWidth = raster.width;
+    raster.originalHeight = raster.height;
+    raster.originalPosition = raster.position;
+
+    var el = document.getElementsByTagName("canvas")[0];
+    el.addEventListener("touchstart", handleStart, false);
+    el.addEventListener("touchend", handleEnd, false);
+    el.addEventListener("touchcancel", handleCancel, false);
+    el.addEventListener("touchleave", handleEnd, false);
+    el.addEventListener("touchmove", handleMove, false);
+    console.log("initialized.");
+
+  }
+
+  function handleStart(evt) {
+    evt.preventDefault();
+    var touches = evt.changedTouches;
+          
+    for (var i=0; i < touches.length; i++) {
+      ongoingTouches.push(copyTouch(touches[i]));
+
+      if (ongoingTouches.length == 1){
+        grab_pt_1 = new Point(ongoingTouches[0].pageX, ongoingTouches[0].pageY);
+      }
+
+      if (ongoingTouches.length == 2){
+        grab_pt_1 = new Point(ongoingTouches[0].pageX, ongoingTouches[0].pageY);
+        grab_pt_2 = new Point(ongoingTouches[1].pageX, ongoingTouches[1].pageY);
+      }
+    }
+  }
+
+  function handleMove(evt) {
+    evt.preventDefault();
+    var touches = evt.changedTouches;
+
+    raster.selected = true;
+
+    var prevTouches = [];
+
+    for (var i=0; i < touches.length; i++) {
+      var idx = ongoingTouchIndexById(touches[i].identifier);
+
+      if(idx >= 0) {
+        prevTouches[idx] = copyTouch(ongoingTouches[i])
+        ongoingTouches.splice(idx, 1, copyTouch(touches[i]));  // swap in the new touch record
+      } else {
+        console.log("can't figure out which touch to continue");
+      }
+    }
+
+    // if(ongoingTouches.length == 1){
+    //   touch_pt_1 = new Point(ongoingTouches[0].pageX, ongoingTouches[0].pageY);
+    //   var diff_translate = touch_pt_1.subtract(grab_pt_1);
+    //   console.log(diff_translate);
+    //   raster.position = raster.originalPosition.add(diff_translate);
+    // }
+
+    if(ongoingTouches.length == 2){
+
+      touch_pt_1 = new Point(ongoingTouches[0].pageX, ongoingTouches[0].pageY);
+      touch_pt_2 = new Point(ongoingTouches[1].pageX, ongoingTouches[1].pageY);
+      var diff_grab = grab_pt_1.subtract(grab_pt_2);
+      var diff = touch_pt_1.subtract(touch_pt_2);
+
+      // move the raster
+      var midpt_grab = grab_pt_1.add(grab_pt_2).divide(2);
+      var midpt_touch = touch_pt_1.add(touch_pt_2).divide(2);
+      var displacement = midpt_touch.subtract(midpt_grab);
+      raster.position = raster.originalPosition.add(displacement);
+
+      // console.log(midpt_grab + " " + midpt_touch + " " + )
+
+      // scale the raster
+      var new_width = diff.length / diff_grab.length * raster.width;
+      raster.scale(new_width / (raster.matrix.scaling.x * raster.width), touch_pt_1.add(touch_pt_2).divide(2))
+
+      // rotate the raster
+      var rot_grab = diff_grab.angle;
+      var rot_diff = diff.angle;
+      var rot_change = rot_diff - rot_grab;
+      console.log(raster.matrix.rotation + " " + rot_change)
+      if(raster.matrix.rotation > rot_change)
+        raster.rotate(-1);
+      if(raster.matrix.rotation < rot_change)   
+        raster.rotate(1);
+        // raster.rotate(raster.matrix.rotation - rot_change)
+
+    }
+  }
+
+  function handleEnd(evt) {
+    evt.preventDefault();
+    console.log("touchend/touchleave.");
+    var touches = evt.changedTouches;
+
+    for (var i=0; i < touches.length; i++) {
+      var idx = ongoingTouchIndexById(touches[i].identifier);
+
+      if(idx >= 0) {
+        ongoingTouches.splice(idx, 1);  // remove it; we're done
+      } else {
+        console.log("can't figure out which touch to end");
+      }
+
+      if (ongoingTouches.length == 1){
+        grab_pt_1 = new Point(ongoingTouches[0].pageX, ongoingTouches[0].pageY);
+      }
+    }
+  }
+
+  function handleCancel(evt) {
+    evt.preventDefault();
+    var touches = evt.changedTouches;
+    
+    for (var i=0; i < touches.length; i++) {
+      ongoingTouches.splice(i, 1);  // remove it; we're done
+    }
+  }
+
+  function copyTouch(touch) {
+    return { identifier: touch.identifier, pageX: touch.pageX, pageY: touch.pageY };
+  }
+
+  function ongoingTouchIndexById(idToFind) {
+    for (var i=0; i < ongoingTouches.length; i++) {
+      var id = ongoingTouches[i].identifier;
+      
+      if (id == idToFind) {
+        return i;
+      }
+    }
+    return -1;    // not found
+  }
+
+</script>
+</head>
+<body>
+  <canvas id="myCanvas" resize></canvas>
+  <img id="lena" style="display:none" src="lena.png">
+</body>
+</html>

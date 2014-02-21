@@ -3,7 +3,7 @@ tool.maxDistance = 100;
 
 var path;
 
-var SPEED_MIN = 5,
+var SPEED_MIN = 8,
 	SPEED_MAX = 10;
 var speed_hist = [0, 0, 0, 0, 0];
 

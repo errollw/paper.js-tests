@@ -1,22 +1,87 @@
 <!DOCTYPE html>
 <html>
-
 <head>
-	
-	<script type="text/javascript" src="js/jquery.js"></script>
+<!-- Load the Paper.js library -->
+<script type="text/javascript" src="js/paper.js"></script>
+<script type="text/javascript" src="js/jquery.js"></script>
+<!-- Define inlined JavaScript -->
+<script type="text/javascript">
 
-	<!-- Load the Paper.js library -->
-	<script type="text/javascript" src="js/paper.js"></script>
-	<!-- Load external PaperScript and associate it with myCanvas -->
-	<script type="text/paperscript" src="js/multitouch_ps.js" canvas="myCanvas"></script>
+  // Make the paper scope global, by injecting it into window:
+  paper.install(window);
 
-	<script type="text/javascript" src="js/hammer.js"></script>
-	<script type="text/javascript" src="js/jquery.hammer.js"></script>
-	<script type="text/javascript" src="js/multitouch.js"></script>
+  // Only executed our code once the DOM is ready.
+  window.onload = function() {
+
+    // Create an empty project and a view for the canvas
+    var canvas = document.getElementById('myCanvas');
+    paper.setup(canvas);
+
+    // Create a raster item using the image tag with id='mona'
+    // var raster = new Raster('lena');
+
+    // // Move the raster to the center of the view
+    // raster.position = view.center;
+
+    // // // Rotate the raster by 45 degrees:
+    // raster.rotate(45);
+
+    var tool = new Tool();
+
+    var shape = new Shape.Rectangle({
+      from: [20, 20],
+      to: [80, 80],
+      strokeColor: 'black'
+    });
+
+    var hitOptions = {
+      segments: true,
+      stroke: true,
+      fill: true,
+      tolerance: 5
+    };
+
+    var raster_to_move;
+    var drag_offset;
+
+    // Define a mousedown and mousedrag handler
+    tool.onMouseDown = function(event) {
+
+      var hitResult = project.hitTest(event.point, hitOptions);
+
+      if (!hitResult){
+        console.log(project);
+        project.clear();
+
+        $.getJSON("lena.json", function(json){
+          project.importJSON(json);
+        });
+        return;
+      }
+
+      raster_to_move = hitResult.item;
+      drag_offset = hitResult.offset;
+    }
+
+    tool.onMouseDrag = function(event) {
+
+      console.log(TouchList)
+
+      if (raster_to_move) {
+     
+
+
+        //console.log(project.exportJSON({asString:true}))
+        raster_to_move.position = raster_to_move.position.add(event.delta);
+      }
+    }
+
+  }
+
+</script>
 </head>
-
 <body>
-	<canvas id="myCanvas" resize></canvas>
+  <canvas id="myCanvas" resize></canvas>
+  <img id="lena" style="display:none" src="lena.png">
 </body>
-
 </html>
