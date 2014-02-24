@@ -5,8 +5,19 @@ paper.install(window);
 var currentTouches = [];  // touches currently active on this frame
 var previousTouches = []; // touches that registered last frame
 
-// the image to move
-var raster;
+var min_delta = 4;
+
+var path;
+
+var strokes = [];
+
+var SPEED_MIN = 4,
+    SPEED_MAX = 10;
+
+var speed_histories = [];
+var speed_history_length = 8;
+
+var first_drags = true;
 
 // Only executed our code once the DOM is ready.
 window.onload = function() {
@@ -14,10 +25,6 @@ window.onload = function() {
     // Create an empty project and a view for the canvas
     var canvas = document.getElementById('myCanvas');
     paper.setup(canvas);
-
-    // Create a test raster image
-    raster = new Raster('peppers.jpg');
-    raster.position = view.center;
 
     // Bind touch handlers for multi-touch operations
     // see: https://developer.mozilla.org/en-US/docs/Web/Guide/Events/Touch_events
@@ -29,25 +36,16 @@ window.onload = function() {
     canv.addEventListener("touchmove",   handleMove,   false);
 }
 
-// for handling clicks as well as touches
-function onTouch(evt) {
-  evt.preventDefault();
-  if (evt.touches.length > 1 || (evt.type == "touchend" && evt.touches.length > 0))
-    return;
+function speed_to_thickness(speed, speed_history){
 
-  var newEvt = document.createEvent("MouseEvents");
-  var type = null;
-  var touch = null;
-  switch (evt.type) {
-    case "touchstart":    type = "mousedown";    touch = evt.changedTouches[0];break;
-    case "touchmove":        type = "mousemove";    touch = evt.changedTouches[0];break;
-    case "touchend":        type = "mouseup";    touch = evt.changedTouches[0];break;
-  }
-  
-  newEvt.initMouseEvent(type, true, true, evt.originalTarget.ownerDocument.defaultView, 0,
-    touch.screenX, touch.screenY, touch.clientX, touch.clientY,
-    evt.ctrlKey, evt.altKey, evt.shiftKey, evt.metaKey, 0, null);
-  evt.originalTarget.dispatchEvent(newEvt);
+    speed_history.shift();
+    speed_history.push(speed);
+
+    var sum = 0;
+    for(var i = 0; i < speed_history.length; i++)
+        sum += parseInt(speed_history[i]);
+    
+    return 12-(sum/speed_history.length);
 }
 
 function handleStart(evt) {
@@ -57,6 +55,12 @@ function handleStart(evt) {
     for (var i=0; i < touches.length; i++) {
         currentTouches.push(copyTouch(touches[i]));
         previousTouches.push(copyTouch(touches[i]));
+
+        var new_stroke = new Path();
+        new_stroke.fillColor = '#00000';
+        touch_pt_1 = new Point(touches[i].pageX, touches[i].pageY);
+        new_stroke.add(touch_pt_1);
+        strokes.push(new_stroke);
     }
 }
 
@@ -67,7 +71,13 @@ function handleMove(evt) {
     for (var i=0; i < touches.length; i++) {
         var idx = ongoingTouchIndexById(touches[i].identifier);
 
-        if(idx >= 0) {
+        if (idx >= 0) {
+
+            // do not register new point unless tool has moved
+            prev_pt = new Point(previousTouches[idx].pageX, previousTouches[idx].pageY);
+            touch_pt = new Point(touches[i].pageX, touches[i].pageY);
+            if (prev_pt.subtract(touch_pt).length < min_delta) break;
+
             //robutstly set previous touch point before changing the current touch array
             previousTouches[idx] = currentTouches[idx] ? copyTouch(currentTouches[idx]) : copyTouch(touches[i]);
             currentTouches[idx] = copyTouch(touches[i]);
@@ -77,42 +87,57 @@ function handleMove(evt) {
     }
 
     // if just one touch, move the raster
-    if (currentTouches.length == 1) {
+    for (var idx = 0; idx < currentTouches.length; idx++) {
 
-        prev_pt_1 = new Point(previousTouches[0].pageX, previousTouches[0].pageY);
-        touch_pt_1 = new Point(currentTouches[0].pageX, currentTouches[0].pageY);
+        prev_pt_1 = new Point(previousTouches[idx].pageX, previousTouches[idx].pageY);
+        touch_pt_1 = new Point(currentTouches[idx].pageX, currentTouches[idx].pageY);
         var diff = touch_pt_1.subtract(prev_pt_1);
-        raster.position = raster.position.add(diff);
+        var delta_midpoint = prev_pt_1.add(touch_pt_1).divide(2);
+
+        // get the clamped speed that the user is drawing at
+        var speed = diff.length;
+        speed = Math.min(SPEED_MAX, Math.max(SPEED_MIN, speed));
+
+        // reset smoothing speed window at the beginning of a stroke
+        if (!speed_histories[idx]){
+            speed_histories[idx] = [];
+            for(var i = 0; i < speed_history_length; i++)
+                speed_histories[idx][i] = speed;
+            first_drag = false;
+        }
+
+        // get thickness to draw at that point
+        var thickness = speed_to_thickness(speed, speed_histories[idx]);
+
+        // make orthogonal vector to simulate brush thickness
+        var step = diff.normalize(thickness);
+        step.angle += 90;
+
+        // add two points to either side of the drawn point
+        var top = delta_midpoint.add(step);
+        var bottom = delta_midpoint.subtract(step);
+        
+        strokes[idx].add(top);
+        strokes[idx].insert(0, bottom);
+
+        strokes[idx].smooth();
     }
 
-    // more complex pan / pinch / rotate operations for two touch points
-    if (currentTouches.length == 2) {
+}
 
-        prev_pt_1 = new Point(previousTouches[0].pageX, previousTouches[0].pageY);
-        prev_pt_2 = new Point(previousTouches[1].pageX, previousTouches[1].pageY);
-        touch_pt_1 = new Point(currentTouches[0].pageX, currentTouches[0].pageY);
-        touch_pt_2 = new Point(currentTouches[1].pageX, currentTouches[1].pageY);
-        var midpt_touch = touch_pt_1.add(touch_pt_2).divide(2);
-
-        // vectors between old touch points and new touch points
-        var vec_prev = prev_pt_1.subtract(prev_pt_2);
-        var vec_new = touch_pt_1.subtract(touch_pt_2);
-
-        // move the raster
-        var v1 = touch_pt_1.subtract(prev_pt_1);
-        var v2 = touch_pt_2.subtract(prev_pt_2);
-        var diff = v1.add(v2).divide(2);
-        raster.position = raster.position.add(diff);
-
-        // scale the raster
-        var d_scale = vec_new.length / vec_prev.length;
-        raster.scale(d_scale, midpt_touch);
-
-        // rotate the raster
-        var d_rot = vec_new.angle - vec_prev.angle;
-        raster.rotate(d_rot,  midpt_touch);
+function draw_dot(point){
+    var path = new Path();
+    path.fillColor = '#00000';
+    path.closed = true;
+    var center = new Point(point.pageX, point.pageY);
+    for (var i = 0; i < 6; i++) {
+        var delta = new Point({
+            length: (10 * 0.7) + (Math.random() * 10 * 0.3),
+            angle: (360 / 6) * i
+        });
+        path.add(center.add(delta));
     }
-
+    path.smooth();
 }
 
 function handleEnd(evt) {
@@ -125,8 +150,16 @@ function handleEnd(evt) {
         var idx = ongoingTouchIndexById(touches[i].identifier);
 
         if(idx >= 0) {
+
+            if (!speed_histories[idx]) {
+                draw_dot(currentTouches[idx]);
+                console.log("TEST")
+            }
+
             previousTouches.splice(idx, 1);
-            currentTouches.splice(idx, 1); 
+            currentTouches.splice(idx, 1);
+            strokes.splice(idx, 1);
+            speed_histories[idx] = null;
         } else {
             console.log("can't figure out which touch to end");
         }
@@ -141,6 +174,8 @@ function handleCancel(evt) {
     for (var i=0; i < touches.length; i++) {
       previousTouches.splice(i, 1);
       currentTouches.splice(i, 1);
+      strokes.splice(i, 1);
+      speed_histories[idx] = null;
     }
 }
 
