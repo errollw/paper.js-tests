@@ -130,6 +130,7 @@ function draw_dot(point){
     path.fillColor = '#00000';
     path.closed = true;
     var center = new Point(point.pageX, point.pageY);
+    
     for (var i = 0; i < 6; i++) {
         var delta = new Point({
             length: (10 * 0.7) + (Math.random() * 10 * 0.3),
