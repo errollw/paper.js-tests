@@ -25,6 +25,10 @@ window.onload = function() {
 
     var tool = new Tool();
 
+    baselinePath = new Path.Line(new Point(padding, view.size.height/2), new Point(view.size.width/2-padding, view.size.height/2))
+    baselinePath.strokeColor = 'lightgrey';
+    baselinePath.dashArray = [5, 5];
+
     controlPointsPath = new Path();
     controlPointsPath.strokeColor = 'red';
 
@@ -48,8 +52,6 @@ window.onload = function() {
         controlPoint.strokeColor = 'black';
         controlPoints.push(controlPoint);
     }
-
-    console.log(ctrlPtGap)
 
     tool.onMouseDown = function(event) {
 

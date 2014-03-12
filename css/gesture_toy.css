@@ -1,0 +1,14 @@
+#controls {
+  position: absolute;
+  top: 16px;
+  left: 16px;
+}
+
+button {
+  background-color: black;
+  color: white; 
+  padding: 12px;
+  margin-right: 16px;
+  font-size: 16px;
+  border: none;
+}
