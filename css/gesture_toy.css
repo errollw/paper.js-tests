@@ -1,14 +1,26 @@
 #controls {
-  position: absolute;
-  top: 16px;
-  left: 16px;
+	position: absolute;
+	top: 16px;
+	left: 16px;
 }
 
 button {
-  background-color: black;
-  color: white; 
-  padding: 12px;
-  margin-right: 16px;
-  font-size: 16px;
-  border: none;
+	display:block;
+	float:left;
+	background-color: LightSlateGray;
+	color: white;
+	padding: 12px;
+	margin: 0;
+	margin-right: 16px;
+	font-size: 14px;
+	border: none;
+	border-radius: 4px;
 }
+
+button:hover {
+	background-color: #92A0AD;
+};
+
+button:active {
+	background-color: #5F6D7A;
+};
