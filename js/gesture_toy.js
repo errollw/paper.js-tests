@@ -1,54 +1,65 @@
 // make the paper scope global, by injecting it into window:
 paper.install(window);
 
-var controlPoints = [];
-var movingControlPoint;
-var numControlPoints = 12;
-
+var vh, vw;
 var padding = 32;
 
-var isMovingControlPoint;
+// our spline interpolates these control points
+var numControlPoints = 12;
+var controlPoints = [], controlPointsPath;
+var isMovingControlPoint, movingControlPoint;
 
-var controlPointsPath;
-
+// we manually sample y-values along the spline
 var samplingPath, sampledPoint;
+var samplingSpeed = 1;
 
-var hingePtLeft, hingePtMid, hingePtRight;
-var hingePath;
+// we animate a simple hinge
 var hingeLength;
+var hingePath;
 
-// Only executed our code once the DOM is ready.
+// only executed our code once the DOM is ready.
 window.onload = function() {
 
-    // Create an empty project and a view for the canvas
+    // create an empty project and a view for the canvas
     paper.setup('myCanvas');
 
+    vh = view.size.height, vw = view.size.width;
+
+    // handles our mouse events
     var tool = new Tool();
 
-    baselinePath = new Path.Line(new Point(padding, view.size.height/2), new Point(view.size.width/2-padding, view.size.height/2))
-    baselinePath.strokeColor = 'lightgrey';
-    baselinePath.dashArray = [5, 5];
+    // simple guides behind spline
+    baselinePath = new Path.Line(new Point(padding, vh/2), new Point(vw/2-padding, vh/2));
+    maxPath = new Path.Line(new Point(padding, vh/2 + vh/3), new Point(vw/2-padding, vh/2 + vh/3));
+    minPath = new Path.Line(new Point(padding, vh/2 - vh/3), new Point(vw/2-padding, vh/2 - vh/3));
+    maxPath.strokeColor = minPath.strokeColor = baselinePath.strokeColor = 'lightgrey';
+    baselinePath.dashArray = maxPath.dashArray = minPath.dashArray = [5, 5];
 
+    // spline between control points
     controlPointsPath = new Path();
     controlPointsPath.strokeColor = 'red';
 
-    var samplingPath = Path.Line(new Point(0,0), new Point(0, view.size.height));
+    // we move this path and calculate intersection with spline to get y-value
+    var samplingPath = Path.Line(new Point(0,0), new Point(0, vh));
     var sampledPoint = new Shape.Circle(new Point(0,0), 3);
     sampledPoint.fillColor = samplingPath.strokeColor = 'green';
     samplingPath.dashArray = [10, 4];
 
-    hingeLength = view.size.width / 8;
-    hingePtLeft = new Point(view.size.width*3/4 - hingeLength, view.size.height/2)
-    hingePtMid = new Point(view.size.width*3/4, view.size.height/2)
-    hingePath = new Path();
-    hingePoint = new Shape.Circle(hingePtMid, 4);
+    // initialize hinge
+    hingeLength = vw / 8;
+    hingePath = new Path([
+        new Point(vw*3/4 - hingeLength, vh/2),
+        new Point(vw*3/4, vh/2),
+        new Point(0, 0)
+    ]);
+    hingePoint = new Shape.Circle(hingePath.segments[1].point, 4);
     hingePoint.fillColor = hingePath.strokeColor = 'dodgerblue';
     hingePath.strokeWidth = 2;
 
-    var ctrlPtGap = (view.size.width/2 - padding*2) / (numControlPoints-1)
-
+    // actually add the control points
+    var ctrlPtGap = (vw/2 - padding*2) / (numControlPoints-1)
     for (i=0; i<numControlPoints; i++) {
-        var controlPoint = new Shape.Circle(new Point(padding + i*ctrlPtGap, view.size.height/2), 5);
+        var controlPoint = new Shape.Circle(new Point(padding + i*ctrlPtGap, vh/2), 5);
         controlPoint.strokeColor = 'black';
         controlPoints.push(controlPoint);
     }
@@ -74,44 +85,46 @@ window.onload = function() {
         isMovingControlPoint = false;
     }
 
-
     view.onFrame = function(event) {
 
+        // redraw the control points spline
         controlPointsPath.clear();
-
         for (i=0; i<controlPoints.length; i++){
             controlPointsPath.add(controlPoints[i].position);
         }
         controlPointsPath.smooth();
 
-        samplingPath.position.x += 1;
-        
+        // move the sampling path (reset it at the end of spline)
+        samplingPath.position.x += samplingSpeed;
         samplingPath.position.x = Math.max(samplingPath.position.x, controlPoints[0].position.x);
-        if (samplingPath.position.x > controlPoints[controlPoints.length-1].position.x)
+        if (samplingPath.position.x > controlPoints[controlPoints.length-1].position.x){
             samplingPath.position.x = controlPoints[0].position.x;
+        }
 
         var intersections = samplingPath.getIntersections(controlPointsPath);
 
-        if (intersections.length == 0) return
+        if (intersections.length == 0) return   // terminate for no intersections
 
         sampledPoint.setPosition(intersections[0].point);
-        console.log(sampledPoint.position)
 
-        var theta = toRad(view.size.height/2 - sampledPoint.position.y);
+        var theta = getTheta(sampledPoint.position.y);
 
-        var d = hingeLength;
-        hingePtRight = new Point( hingePtMid.x + d * Math.cos(theta), hingePtMid.y + d * Math.sin(theta) )
-
-        console.log(hingePtRight);
-
-        hingePath.clear();
-        hingePath.add(hingePtLeft);
-        hingePath.add(hingePtMid);
-        hingePath.add(hingePtRight);
+        // set position of final hinge limb
+        hingePath.segments[2].point = new Point(
+            hingePath.segments[1].point.x + hingeLength * Math.cos(theta),
+            hingePath.segments[1].point.y + hingeLength * Math.sin(theta) )
     }
+
+    // control handlers
+    var btnSpeedUp = document.getElementById('btnSpeedUp');
+    var btnSpeedDown = document.getElementById('btnSpeedDown');
+    btnSpeedUp.addEventListener("mouseup",  function(){samplingSpeed += 1},  false);
+    btnSpeedDown.addEventListener("mouseup",  function(){samplingSpeed -= 1},  false);
 
 }
 
-function toRad(val) {
-    return val * Math.PI / 180;
+function getTheta(val) {
+    var diffFromMid = val - vh/2;
+    var scaledDiff = (diffFromMid / (vh/3))*180
+    return scaledDiff * Math.PI / 180;
 }
