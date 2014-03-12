@@ -3,6 +3,9 @@ paper.install(window);
 
 var controlPoints = [];
 var movingControlPoint;
+var numControlPoints = 12;
+
+var padding = 32;
 
 var isMovingControlPoint;
 
@@ -10,8 +13,9 @@ var controlPointsPath;
 
 var samplingPath, sampledPoint;
 
-var hingePt0, hingePt1, hingePt2;
+var hingePtLeft, hingePtMid, hingePtRight;
 var hingePath;
+var hingeLength;
 
 // Only executed our code once the DOM is ready.
 window.onload = function() {
@@ -27,17 +31,25 @@ window.onload = function() {
     var samplingPath = Path.Line(new Point(0,0), new Point(0, view.size.height));
     var sampledPoint = new Shape.Circle(new Point(0,0), 3);
     sampledPoint.fillColor = samplingPath.strokeColor = 'green';
+    samplingPath.dashArray = [10, 4];
 
-    hingePt0 = new Point(700, 300)
-    hingePt1 = new Point(900, 300)
+    hingeLength = view.size.width / 8;
+    hingePtLeft = new Point(view.size.width*3/4 - hingeLength, view.size.height/2)
+    hingePtMid = new Point(view.size.width*3/4, view.size.height/2)
     hingePath = new Path();
-    hingePath.strokeColor = 'green';
+    hingePoint = new Shape.Circle(hingePtMid, 4);
+    hingePoint.fillColor = hingePath.strokeColor = 'dodgerblue';
+    hingePath.strokeWidth = 2;
 
-    for (i=0; i<10; i++) {
-        var controlPoint = new Shape.Circle(new Point(50 + i*50, 300), 5);
+    var ctrlPtGap = (view.size.width/2 - padding*2) / (numControlPoints-1)
+
+    for (i=0; i<numControlPoints; i++) {
+        var controlPoint = new Shape.Circle(new Point(padding + i*ctrlPtGap, view.size.height/2), 5);
         controlPoint.strokeColor = 'black';
         controlPoints.push(controlPoint);
     }
+
+    console.log(ctrlPtGap)
 
     tool.onMouseDown = function(event) {
 
@@ -83,17 +95,17 @@ window.onload = function() {
         sampledPoint.setPosition(intersections[0].point);
         console.log(sampledPoint.position)
 
-        var theta = toRad(sampledPoint.position.y);
+        var theta = toRad(view.size.height/2 - sampledPoint.position.y);
 
-        var d = 200;
-        hingePt2 = new Point( hingePt1.x + d * Math.cos(theta), hingePt1.y + d * Math.sin(theta) )
+        var d = hingeLength;
+        hingePtRight = new Point( hingePtMid.x + d * Math.cos(theta), hingePtMid.y + d * Math.sin(theta) )
 
-        console.log(hingePt2);
+        console.log(hingePtRight);
 
         hingePath.clear();
-        hingePath.add(hingePt0);
-        hingePath.add(hingePt1);
-        hingePath.add(hingePt2);
+        hingePath.add(hingePtLeft);
+        hingePath.add(hingePtMid);
+        hingePath.add(hingePtRight);
     }
 
 }
