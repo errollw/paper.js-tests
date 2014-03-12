@@ -86,7 +86,6 @@ function handleMove(evt) {
         }
     }
 
-    // if just one touch, move the raster
     for (var idx = 0; idx < currentTouches.length; idx++) {
 
         prev_pt_1 = new Point(previousTouches[idx].pageX, previousTouches[idx].pageY);
