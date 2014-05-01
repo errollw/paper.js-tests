@@ -6,7 +6,9 @@ var current_pointers = [];  // pointers currently active on this frame
 var prev_pointers = [];     // pointers that registered last frame
 
 // special cases for multi-touch drag/scale/rotate
-var multi_touch_start_pts = [];
+var mt_start_pts = [],
+    vec_mt_start_pts,       // vector from one mt start point to the other
+    midpt_mt_start_pts;     // midpoint between both mt start pts
 
 // the image to move
 var raster;
@@ -34,8 +36,8 @@ window.onload = function() {
     // bind mouse handlers for standard interaction
     canv.addEventListener("mousedown", handle_mouse_down, false);
     canv.addEventListener("mousemove", handle_mouse_move, false);
-    canv.addEventListener("mouseup",   handle_mouse_up, false);
-    canv.addEventListener("mouseout",  handle_mouse_up, false);
+    canv.addEventListener("mouseup",   handle_mouse_up,   false);
+    canv.addEventListener("mouseout",  handle_mouse_up,   false);
 }
 
 function handle_mouse_down(evt) {
@@ -48,10 +50,12 @@ function handle_mouse_down(evt) {
 
 function handle_mouse_move(evt) {
 
+    // only handle mouse if it is the only active pointer (no touch)
     if (current_pointers.length == 1){
         prev_pointers[0] = copy_mouse(current_pointers[0]);
         current_pointers[0] = copy_mouse(evt);
 
+        // update raster position based on pointer delta
         prev_pt = new Point(prev_pointers[0].pageX, prev_pointers[0].pageY);
         current_pt = new Point(current_pointers[0].pageX, current_pointers[0].pageY);
         var delta = current_pt.subtract(prev_pt);
@@ -83,11 +87,13 @@ function handle_touch_start(evt) {
 
     // if now multitouching, initialize multitouch transform data
     if (current_pointers.length >= 2) {
-        multi_touch_start_pts[0] = copyTouch(current_pointers[0]);
-        multi_touch_start_pts[1] = copyTouch(current_pointers[1]);
-        raster.multitouch_start_pos = raster.position;
-        raster.multitouch_start_rot = raster.rotation;
-        raster.mt_start_scaling = raster.scaling;
+        mt_start_pts[0] = new Point(current_pointers[0].pageX, current_pointers[0].pageY);
+        mt_start_pts[1] = new Point(current_pointers[1].pageX, current_pointers[1].pageY);
+        vec_mt_start_pts = mt_start_pts[0].subtract(mt_start_pts[1]);
+        midpt_mt_start_pts = mt_start_pts[0].add(mt_start_pts[1]).divide(2);
+        raster.mt_start_position = raster.position;
+        raster.mt_start_rotation = raster.rotation;
+        raster.mt_start_scaling  = raster.scaling;
     }
 }
 
@@ -117,29 +123,24 @@ function handle_touch_move(evt) {
         raster.position = raster.position.add(diff);
     }
 
-    // more complex pan / pinch / rotate operations for two touch points
+    // more complex transform operations for two touch points
     if (current_pointers.length == 2) {
 
         touch_pt_1 = new Point(current_pointers[0].pageX, current_pointers[0].pageY);
         touch_pt_2 = new Point(current_pointers[1].pageX, current_pointers[1].pageY);
-        touch_start_pt_1 = new Point(multi_touch_start_pts[0].pageX, multi_touch_start_pts[0].pageY);
-        touch_start_pt_2 = new Point(multi_touch_start_pts[1].pageX, multi_touch_start_pts[1].pageY);
+        var vec_touch = touch_pt_1.subtract(touch_pt_2);    
         var midpt_touch = touch_pt_1.add(touch_pt_2).divide(2);
-        var midpt_touch_starts = touch_start_pt_1.add(touch_start_pt_2).divide(2);
-
-        var vec_touch = touch_pt_1.subtract(touch_pt_2);
-        var vec_mt_start = touch_start_pt_1.subtract(touch_start_pt_2);
 
         // move the raster
-        var diff = midpt_touch.subtract(midpt_touch_starts)
-        raster.position = raster.multitouch_start_pos.add(diff);
+        var diff = midpt_touch.subtract(midpt_mt_start_pts)
+        raster.position = raster.mt_start_position.add(diff);
 
         // rotate the raster
-        var d_rot = vec_touch.angle - vec_mt_start.angle;
-        raster.rotation = raster.multitouch_start_rot + d_rot;
+        var d_rot = vec_touch.angle - vec_mt_start_pts.angle;
+        raster.rotation = raster.mt_start_rotation + d_rot;
 
         // scale the raster
-        var d_scale = vec_touch.length / vec_mt_start.length;
+        var d_scale = vec_touch.length / vec_mt_start_pts.length;
         raster.scaling = raster.mt_start_scaling.multiply([d_scale,d_scale]);
     }
 
